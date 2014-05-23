@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import subprocess
+import math
 
 
 def log(verbosity, level, message):
@@ -101,8 +102,18 @@ def getDateOfPoint(point):
     command = ['git', 'show', '-s', '--format=%ci', point]
     return subprocess.check_output(command).splitlines()[0]
 
+def openCvsFile(cvsFileName):
+    try:
+        cvsFile = open(cvsFileName, "w")
+    except IOError:
+        cvsFile = None
+    return cvsFile
 
-def findHalfLife(startingPoint, endPoint, targetObjects, verbosity):
+def writeToCvsFile(cvsFile, line):
+    if(cvsFile != None):
+        cvsFile.write(line)
+
+def findHalfLife(startingPoint, endPoint, targetObjects, verbosity, cvsFile):
     linesAtStart, filesAtStartingPoint = processStartingPoint(startingPoint, targetObjects, verbosity)
 
     for targetPoint in getTargetPoints(startingPoint, endPoint):
@@ -117,18 +128,37 @@ def findHalfLife(startingPoint, endPoint, targetObjects, verbosity):
 
             log(verbosity, 0, 'reached half point for {} from {} at {} ({} commits)'.format
                 (startingPoint, dateOfStart, dateOfHalfPoint, commitsFromStartToHalfPoint))
+            writeToCvsFile(cvsFile,'{},{},{},{}\n'.format(startingPoint,dateOfStart,dateOfHalfPoint,commitsFromStartToHalfPoint))
             return
 
     log(verbosity, 0, 'no half point found for {}'.format(startingPoint))
 
-
+#TODO integrate it to the tool-set
+#The "time" unit is number of commits
+def estimateHalfLife(startingPoint, endPoint, targetObjects, verbosity):
+    linesAtStart, filesAtStartingPoint = processStartingPoint(startingPoint, targetObjects, verbosity)
+    linesChangedAtTarget = countChangedLines(startingPoint, endPoint, filesAtStartingPoint)
+    commitsFromStart = len(getPointsInInterval(startingPoint, endPoint))
+    log(verbosity, 2, 'linesAtSTart {}, linesChangedAtTarget {}, commitsFromStart {}'.format(linesAtStart,linesChangedAtTarget,commitsFromStart))
+    return (float(commitsFromStart)*float(math.log(2)))/(float(math.log(linesAtStart))-float(math.log(linesAtStart-linesChangedAtTarget)))
+    
+    
 def main():
     args = parseArguments()
     
     points = getPointsInInterval(args.startingPoint, args.endPoint)
     points.insert(0, args.startingPoint)
+    
+    #TODO: make command line input for it.
+    cvsFile = openCvsFile("output.cvs")
+    writeToCvsFile(cvsFile, "startingGitHash,dateOfStart,dateOfHalfPoint,numOfCommits\n")
+    
+    #log(args.verbosity, 0, 'Estimated code half-life: {}'. format(estimateHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.verbosity)))
+    
     for currentPoint in points:
-        findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity)
+        findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity, cvsFile)
+    
+    cvsFile.close()
 
 
 if __name__ == "__main__":
