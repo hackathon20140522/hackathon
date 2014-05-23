@@ -113,22 +113,22 @@ def getDateOfPoint(point):
     command = ['git', 'show', '-s', '--format=%ci', point]
     return subprocess.check_output(command).splitlines()[0]
 
-def openCvsFile(cvsFileName):
+def openCsvFile(csvFileName):
     try:
-        cvsFile = open(cvsFileName, "w")
+        csvFile = open(csvFileName, "w")
     except IOError:
-        cvsFile = None
-    return cvsFile
+        csvFile = None
+    return csvFile
 
-def closeCvsFile(cvsFile):
-    if(cvsFile != None):
-        cvsFile.close()
+def closeCsvFile(csvFile):
+    if(csvFile != None):
+        csvFile.close()
 
-def writeToCvsFile(cvsFile, line):
-    if(cvsFile != None):
-        cvsFile.write(line)
+def writeToCsvFile(csvFile, line):
+    if(csvFile != None):
+        csvFile.write(line)
 
-def findHalfLife(startingPoint, endPoint, targetObjects, verbosity, cvsFile):
+def findHalfLife(startingPoint, endPoint, targetObjects, verbosity, csvFile):
     linesAtStart, filesAtStartingPoint = processStartingPoint(startingPoint, targetObjects, verbosity)
 
     for targetPoint in getTargetPoints(startingPoint, endPoint):
@@ -144,7 +144,7 @@ def findHalfLife(startingPoint, endPoint, targetObjects, verbosity, cvsFile):
             log(verbosity, 0, 'reached half point for {} from {} at {} ({} commits)'.format
                 (startingPoint, dateOfStart, dateOfHalfPoint, commitsFromStartToHalfPoint))
 
-            writeToCvsFile(cvsFile,'{},{},{},{}\n'.format(startingPoint,dateOfStart,dateOfHalfPoint,commitsFromStartToHalfPoint))
+            writeToCsvFile(csvFile,'{},{},{},{}\n'.format(startingPoint,dateOfStart,dateOfHalfPoint,commitsFromStartToHalfPoint))
 
             return targetPoint
 
@@ -168,19 +168,19 @@ def main():
     points.insert(0, args.startingPoint)
     
     #TODO: make command line input for it.
-    cvsFile = openCvsFile("output.cvs")
-    writeToCvsFile(cvsFile, "startingGitHash,dateOfStart,dateOfHalfPoint,numOfCommits\n")
+    csvFile = openCsvFile("output.csv")
+    writeToCsvFile(csvFile, "startingGitHash,dateOfStart,dateOfHalfPoint,numOfCommits\n")
     
     #log(args.verbosity, 0, 'Estimated code half-life: {}'. format(estimateHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.verbosity)))
     
     if args.single_commit:
-        findHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.verbosity, cvsFile)
+        findHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.verbosity, csvFile)
 
     elif args.linear:
         points = getPointsInInterval(args.startingPoint, args.endPoint)
         points.insert(0, args.startingPoint)
         for currentPoint in points:
-            findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity, cvsFile)
+            findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity, csvFile)
 
     elif args.logarithmic:
         points = getPointsInInterval(args.startingPoint, args.endPoint)
@@ -188,11 +188,11 @@ def main():
         nextPointToStartFrom = args.startingPoint
         for currentPoint in points:
             if currentPoint == nextPointToStartFrom:
-                result = findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity, cvsFile)
+                result = findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity, csvFile)
                 if result is not None:
                     nextPointToStartFrom = result
 
-    closeCvsFile(cvsFile)
+    closeCsvFile(csvFile)
     
 if __name__ == "__main__":
     main()
