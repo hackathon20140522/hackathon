@@ -3,19 +3,28 @@
 import subprocess
 
 
+def log(verbosity, level, message):
+    if verbosity >= level:
+        print message
+
+
 def parseArguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('targetObjects')
-    parser.add_argument('startingPoint')
-    parser.add_argument('endPoint')
+
+    parser.add_argument('targetObjects', help='the files/directories you want to analyze')
+    parser.add_argument('startingPoint', help='the treeish you want to start on')
+    parser.add_argument('endPoint', help='the treeish you want to run to')
+    
+    parser.add_argument('-v', '--verbosity', type=int, choices=[0, 1, 2], help='verbosity level')
 
     args = parser.parse_args()
 
-    print 'target objects: {}'.format(args.targetObjects)
-    print 'starting point: {}'.format(args.startingPoint)
-    print 'end point: {}'.format(args.endPoint)
+    log(args.verbosity, 1, 'target objects: {}'.format(args.targetObjects))
+    log(args.verbosity, 1, 'starting point: {}'.format(args.startingPoint))
+    log(args.verbosity, 1, 'end point: {}'.format(args.endPoint))
+    log(args.verbosity, 1, 'verbosity: {}'.format(args.verbosity))
     return args
 
 
@@ -33,11 +42,11 @@ def countLinesInOldFile(targetFile, oldPoint):
     return lineCount
 
 
-def processStartingPoint(startingPoint, targetObjects):
+def processStartingPoint(startingPoint, targetObjects, verbosity):
     foundFiles = findFilesAtPoint(startingPoint, targetObjects)
     sumOfLines = sum(countLinesInOldFile(f, startingPoint) for f in foundFiles)
 
-    print 'number of lines in all files: {}'.format(sumOfLines)
+    log(verbosity, 1, 'number of lines in all files: {}'.format(sumOfLines))
     return sumOfLines, foundFiles
 
 
@@ -93,21 +102,24 @@ def getDateOfPoint(point):
     return subprocess.check_output(command).splitlines()[0]
 
 
-def findHalfLife(startingPoint, endPoint, targetObjects):
-    linesAtStart, filesAtStartingPoint = processStartingPoint(startingPoint, targetObjects)
+def findHalfLife(startingPoint, endPoint, targetObjects, verbosity):
+    linesAtStart, filesAtStartingPoint = processStartingPoint(startingPoint, targetObjects, verbosity)
 
     for targetPoint in getTargetPoints(startingPoint, endPoint):
         linesChangedAtTarget = countChangedLines(startingPoint, targetPoint, filesAtStartingPoint)
 
-        print 'changed lines / all lines: {} / {}'.format(linesChangedAtTarget, linesAtStart)
+        log(verbosity, 1, 'changed lines / all lines: {} / {}'.format(linesChangedAtTarget, linesAtStart))
         halfPointReached = linesChangedAtTarget > (linesAtStart / 2)
         if halfPointReached:
             dateOfStart = getDateOfPoint(startingPoint)
             dateOfHalfPoint = getDateOfPoint(targetPoint)
             commitsFromStartToHalfPoint = len(getPointsInInterval(startingPoint, targetPoint))
-            print 'reached half point from {} at {} ({} commits)'.format(dateOfStart, dateOfHalfPoint, commitsFromStartToHalfPoint)
+
+            log(verbosity, 0, 'reached half point for {} from {} at {} ({} commits)'.format
+                (startingPoint, dateOfStart, dateOfHalfPoint, commitsFromStartToHalfPoint))
             return
-    print 'no half point found'
+
+    log(verbosity, 0, 'no half point found for {}'.format(startingPoint))
 
 
 def main():
@@ -116,7 +128,7 @@ def main():
     points = getPointsInInterval(args.startingPoint, args.endPoint)
     points.insert(0, args.startingPoint)
     for currentPoint in points:
-        findHalfLife(currentPoint, args.endPoint, args.targetObjects)
+        findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity)
 
 
 if __name__ == "__main__":
