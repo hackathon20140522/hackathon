@@ -16,6 +16,7 @@ def parseArguments():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-s", "--single-commit", action="store_true")
     group.add_argument("-l", "--linear", action="store_true")
+    group.add_argument("-ll", "--logarithmic", action="store_true")
 
     parser.add_argument('targetObjects', help='the files/directories you want to analyze')
     parser.add_argument('startingPoint', help='the treeish you want to start on')
@@ -33,6 +34,8 @@ def parseArguments():
         log(args.verbosity, 1, 'single commit mode')
     elif args.linear:
         log(args.verbosity, 1, 'linear mode')
+    elif args.logarithmic:
+        log(args.verbosity, 1, 'logarithmic mode')
     return args
 
 
@@ -125,9 +128,10 @@ def findHalfLife(startingPoint, endPoint, targetObjects, verbosity):
 
             log(verbosity, 0, 'reached half point for {} from {} at {} ({} commits)'.format
                 (startingPoint, dateOfStart, dateOfHalfPoint, commitsFromStartToHalfPoint))
-            return
+            return targetPoint
 
     log(verbosity, 0, 'no half point found for {}'.format(startingPoint))
+    return None
 
 
 def main():
@@ -141,6 +145,16 @@ def main():
         points.insert(0, args.startingPoint)
         for currentPoint in points:
             findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity)
+
+    elif args.logarithmic:
+        points = getPointsInInterval(args.startingPoint, args.endPoint)
+        points.insert(0, args.startingPoint)
+        nextPointToStartFrom = args.startingPoint
+        for currentPoint in points:
+            if currentPoint == nextPointToStartFrom:
+                result = findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity)
+                if result is not None:
+                    nextPointToStartFrom = result
 
 
 if __name__ == "__main__":
