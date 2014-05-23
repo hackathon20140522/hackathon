@@ -9,42 +9,49 @@ def parseArguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('targetObjects')
     parser.add_argument('startingPoint')
+    parser.add_argument('endPoint')
 
     args = parser.parse_args()
 
     print 'target objects: {}'.format(args.targetObjects)
     print 'starting point: {}'.format(args.startingPoint)
+    print 'end point: {}'.format(args.endPoint)
     return args
 
 
 def findFilesAtPoint(startingPoint, targetObjects):
-    foundFiles = subprocess.check_output(['git', 'ls-tree', '--name-only', '-r', startingPoint, targetObjects])
+    command = ['git', 'ls-tree', '--name-only', '-r', startingPoint, targetObjects]
+    foundFiles = subprocess.check_output(command)
     return foundFiles.splitlines()
 
 
-def countLinesInFile(targetFile):
-    wcResult = subprocess.check_output(['wc', '-l', targetFile])
-    firstColumn = wcResult.split()[0]
+def countLinesInOldFile(targetFile, oldPoint):
+    showCommand = ['git', 'show', oldPoint + ':' + targetFile]
+    oldFileContent = subprocess.check_output(showCommand)
+    lineCount = len(oldFileContent.splitlines())
 
-    print 'lines in current file: {}'.format(firstColumn)
-    return int(firstColumn)
+    return lineCount
 
 
 def processStartingPoint(startingPoint, targetObjects):
     foundFiles = findFilesAtPoint(startingPoint, targetObjects)
-    sumOfLines = sum(countLinesInFile(f) for f in foundFiles)
+    sumOfLines = sum(countLinesInOldFile(f, startingPoint) for f in foundFiles)
 
     print 'number of lines in all files: {}'.format(sumOfLines)
     return sumOfLines, foundFiles
 
 
 def findChangedFiles(startingPoint, targetPoint):
-    foundFiles = subprocess.check_output(['git', 'diff-tree', '--no-commit-id', '--name-only', '-r', startingPoint, targetPoint])
+    command = ['git', 'diff-tree', '--no-commit-id', '--name-only', '-r', startingPoint, targetPoint]
+    foundFiles = subprocess.check_output(command)
     return foundFiles.splitlines()
 
 
 def statDiffOnFiles(startingPoint, targetPoint, interestingFiles):
-    interestingDiff = subprocess.check_output(['git', 'diff', '--numstat', startingPoint, targetPoint] + list(interestingFiles))
+    if not interestingFiles:
+        return []
+    command = ['git', 'diff', '--numstat', startingPoint, targetPoint, '--'] + list(interestingFiles)
+    interestingDiff = subprocess.check_output(command)
     return interestingDiff.splitlines()
 
 
@@ -66,27 +73,50 @@ def countChangedLines(startingPoint, targetPoint, filesAtStartingPoint):
 
     sumOfChangedLines = sum(extractCountOfChangedLines(line) for line in interestingDiff)
 
-    print 'sumOfChangedLines: {}'.format(sumOfChangedLines)
     return sumOfChangedLines
 
 
-def getNextTargetPoint(startingPoint, endPoint):
-    logResult = subprocess.check_output(['git', 'rev-list', '--reverse', startingPoint + '..' + endPoint])
-    logLines = logResult.splitlines()
+def getPointsInInterval(startingPoint, endPoint):
+    command = ['git', 'rev-list', '--reverse', startingPoint + '..' + endPoint]
+    logResult = subprocess.check_output(command)
+    return logResult.splitlines()
 
-    for line in logLines:
-        yield line.split()[0]
+
+def getTargetPoints(startingPoint, endPoint):
+    logLines = getPointsInInterval(startingPoint, endPoint)
+
+    return [line.split()[0] for line in logLines]
+
+
+def getDateOfPoint(point):
+    command = ['git', 'show', '-s', '--format=%ci', point]
+    return subprocess.check_output(command).splitlines()[0]
+
+
+def findHalfLife(startingPoint, endPoint, targetObjects):
+    linesAtStart, filesAtStartingPoint = processStartingPoint(startingPoint, targetObjects)
+
+    for targetPoint in getTargetPoints(startingPoint, endPoint):
+        linesChangedAtTarget = countChangedLines(startingPoint, targetPoint, filesAtStartingPoint)
+
+        print 'changed lines / all lines: {} / {}'.format(linesChangedAtTarget, linesAtStart)
+        halfPointReached = linesChangedAtTarget > (linesAtStart / 2)
+        if halfPointReached:
+            dateOfStart = getDateOfPoint(startingPoint)
+            dateOfHalfPoint = getDateOfPoint(targetPoint)
+            commitsFromStartToHalfPoint = len(getPointsInInterval(startingPoint, targetPoint))
+            print 'reached half point from {} at {} ({} commits)'.format(dateOfStart, dateOfHalfPoint, commitsFromStartToHalfPoint)
+            return
+    print 'no half point found'
 
 
 def main():
     args = parseArguments()
-
-    linesAtStart, filesAtStartingPoint = processStartingPoint(args.startingPoint, args.targetObjects)
-
-    endPoint = 'HEAD'
-    for targetPoint in list(getNextTargetPoint(args.startingPoint, endPoint)):
-        linesChangedAtTarget = countChangedLines(args.startingPoint, targetPoint, filesAtStartingPoint)
-        print 'changed lines: {} / all lines: {}'.format(linesChangedAtTarget, linesAtStart)
+    
+    points = getPointsInInterval(args.startingPoint, args.endPoint)
+    points.insert(0, args.startingPoint)
+    for currentPoint in points:
+        findHalfLife(currentPoint, args.endPoint, args.targetObjects)
 
 
 if __name__ == "__main__":
