@@ -47,17 +47,18 @@ def findFilesAtPoint(startingPoint, targetObjects):
     return foundFiles.splitlines()
 
 
-def countLinesInOldFile(targetFile, oldPoint):
+def countLinesInOldFile(targetFile, oldPoint, verbosity):
     showCommand = ['git', 'show', oldPoint + ':' + targetFile]
     oldFileContent = subprocess.check_output(showCommand)
     lineCount = len(oldFileContent.splitlines())
+    log(verbosity, 2, 'line count ({}): {}'.format(targetFile, lineCount))
 
     return lineCount
 
 
 def processStartingPoint(startingPoint, targetObjects, verbosity):
     foundFiles = findFilesAtPoint(startingPoint, targetObjects)
-    sumOfLines = sum(countLinesInOldFile(f, startingPoint) for f in foundFiles)
+    sumOfLines = sum(countLinesInOldFile(f, startingPoint, verbosity) for f in foundFiles)
 
     log(verbosity, 1, 'number of lines in all files: {}'.format(sumOfLines))
     return sumOfLines, foundFiles
