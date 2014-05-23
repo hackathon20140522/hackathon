@@ -14,16 +14,17 @@ def parseArguments():
     parser = argparse.ArgumentParser()
     
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-s", "--single-commit", action="store_true")
-    group.add_argument("-l", "--linear", action="store_true")
-    group.add_argument("-ll", "--logarithmic", action="store_true")
+    group.add_argument('-s', '--single-commit', action='store_true', help='run for a single commit')
+    group.add_argument('-l', '--linear', action='store_true', help='run linearly between two commits')
+    group.add_argument('-ll', '--logarithmic', action='store_true', help='run from half point to half point')
 
     parser.add_argument('targetObjects', help='the files/directories you want to analyze')
     parser.add_argument('startingPoint', help='the treeish you want to start on')
     parser.add_argument('endPoint', help='the treeish you want to run to')
     
     parser.add_argument('-v', '--verbosity', type=int, choices=[0, 1, 2], help='verbosity level')
-    parser.add_argument('-f', '--fast', action="store_true", help='use fast (logarithmic) algorithm')
+    parser.add_argument('-f', '--fast', action='store_true', help='use fast (logarithmic) algorithm')
+    parser.add_argument('-o', '--output', help='create a csv file with the results')
 
     args = parser.parse_args()
 
@@ -32,6 +33,8 @@ def parseArguments():
     log(args.verbosity, 1, 'end point: {}'.format(args.endPoint))
     log(args.verbosity, 1, 'verbosity: {}'.format(args.verbosity))
     log(args.verbosity, 1, 'fast: {}'.format(args.fast))
+    log(args.verbosity, 1, 'output: {}'.format(args.output))
+
     if args.single_commit:
         log(args.verbosity, 1, 'single commit mode')
     elif args.linear:
@@ -117,6 +120,9 @@ def getDateOfPoint(point):
 
 
 def openCsvFile(csvFileName):
+    if not csvFileName:
+        return None
+
     try:
         csvFile = open(csvFileName, "w")
     except IOError:
@@ -217,8 +223,7 @@ def main():
     points = getPointsInInterval(args.startingPoint, args.endPoint)
     points.insert(0, args.startingPoint)
     
-    #TODO: make command line input for it.
-    csvFile = openCsvFile("output.csv")
+    csvFile = openCsvFile(args.output)
     writeToCsvFile(csvFile, "startingGitHash,dateOfStart,dateOfHalfPoint,numOfCommits\n")
     
     if args.single_commit:
