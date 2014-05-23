@@ -12,6 +12,10 @@ def parseArguments():
     import argparse
 
     parser = argparse.ArgumentParser()
+    
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-s", "--single-commit", action="store_true")
+    group.add_argument("-l", "--linear", action="store_true")
 
     parser.add_argument('targetObjects', help='the files/directories you want to analyze')
     parser.add_argument('startingPoint', help='the treeish you want to start on')
@@ -25,6 +29,10 @@ def parseArguments():
     log(args.verbosity, 1, 'starting point: {}'.format(args.startingPoint))
     log(args.verbosity, 1, 'end point: {}'.format(args.endPoint))
     log(args.verbosity, 1, 'verbosity: {}'.format(args.verbosity))
+    if args.single_commit:
+        log(args.verbosity, 1, 'single commit mode')
+    elif args.linear:
+        log(args.verbosity, 1, 'linear mode')
     return args
 
 
@@ -125,10 +133,14 @@ def findHalfLife(startingPoint, endPoint, targetObjects, verbosity):
 def main():
     args = parseArguments()
     
-    points = getPointsInInterval(args.startingPoint, args.endPoint)
-    points.insert(0, args.startingPoint)
-    for currentPoint in points:
-        findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity)
+    if args.single_commit:
+        findHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.verbosity)
+
+    elif args.linear:
+        points = getPointsInInterval(args.startingPoint, args.endPoint)
+        points.insert(0, args.startingPoint)
+        for currentPoint in points:
+            findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity)
 
 
 if __name__ == "__main__":
