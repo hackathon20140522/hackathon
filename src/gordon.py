@@ -103,14 +103,15 @@ def countChangedLines(startingPoint, targetPoint, filesAtStartingPoint):
     return sumOfChangedLines
 
 
-def getPointsInInterval(startingPoint, endPoint):
-    command = ['git', 'rev-list', '--reverse', startingPoint + '..' + endPoint]
+
+def getPointsInInterval(startingPoint, endPoint, targetObjects):
+    command = ['git', 'rev-list', '--reverse', startingPoint + '..' + endPoint, '--', targetObjects]
     logResult = subprocess.check_output(command, bufsize=-1)
     return logResult.splitlines()
 
 
-def getTargetPoints(startingPoint, endPoint):
-    logLines = getPointsInInterval(startingPoint, endPoint)
+def getTargetPoints(startingPoint, endPoint, targetObjects):
+    logLines = getPointsInInterval(startingPoint, endPoint, targetObjects)
 
     return [line.split()[0] for line in logLines]
 
@@ -152,10 +153,10 @@ def checkTarget(startingPoint, targetPoint, filesAtStartingPoint, linesAtStart, 
     return None;
 
 
-def announceHalfPoint(startingPoint, targetPoint, csvFile, verbosity):
+def announceHalfPoint(startingPoint, targetPoint, targetOjects, csvFile, verbosity):
     dateOfStart = getDateOfPoint(startingPoint)
     dateOfHalfPoint = getDateOfPoint(targetPoint)
-    commitsFromStartToHalfPoint = len(getPointsInInterval(startingPoint, targetPoint))
+    commitsFromStartToHalfPoint = len(getPointsInInterval(startingPoint, targetPoint, targetOjects))
 
     writeToCsvFile(csvFile, '{},{},{},{}\n'.
         format(startingPoint, dateOfStart, dateOfHalfPoint, commitsFromStartToHalfPoint))
@@ -165,7 +166,7 @@ def announceHalfPoint(startingPoint, targetPoint, csvFile, verbosity):
 
 def findHalfLife(startingPoint, endPoint, targetObjects, fast, csvFile, verbosity):
     linesAtStart, filesAtStartingPoint = processStartingPoint(startingPoint, targetObjects, verbosity)
-    targetPoints = getTargetPoints(startingPoint, endPoint)
+    targetPoints = getTargetPoints(startingPoint, endPoint, targetObjects)
     if len(targetPoints) == 0:
         return None
     if checkTarget(startingPoint, targetPoints[len(targetPoints) - 1], filesAtStartingPoint, linesAtStart, verbosity) is None:
@@ -200,18 +201,22 @@ def estimation(countOfCommitsFromStart, linesAtStart, linesChangedAtTarget):
     import math
 
     numerator = float(countOfCommitsFromStart) * float(math.log(2))
-    linesRemaining = linesAtStart - linesChangedAtTarget
+    linesRemaining = linesAtStart - linesChangedAtTarget  
+    if linesRemaining == 0:
+        return 0
+    
     denominator = float(math.log(linesAtStart)) - float(math.log(linesRemaining))
-
-    if denominator == 0:
+    if denominator == 0  :        
         return float("inf")
+    
+    
     return numerator / denominator
 
 
 def estimateHalfLife(startingPoint, endPoint, targetObjects, verbosity):
     linesAtStart, filesAtStartingPoint = processStartingPoint(startingPoint, targetObjects, verbosity)
     linesChangedAtTarget = countChangedLines(startingPoint, endPoint, filesAtStartingPoint)
-    countOfCommitsFromStart = len(getPointsInInterval(startingPoint, endPoint))
+    countOfCommitsFromStart = len(getPointsInInterval(startingPoint, endPoint, targetObjects))
 
     log(verbosity, 2, 'linesAtStart: {}, linesChangedAtTarget: {}, countOfCommitsFromStart: {}'.
         format(linesAtStart, linesChangedAtTarget, countOfCommitsFromStart))
@@ -221,7 +226,7 @@ def estimateHalfLife(startingPoint, endPoint, targetObjects, verbosity):
 def main():
     args = parseArguments()
     
-    points = getPointsInInterval(args.startingPoint, args.endPoint)
+    points = getPointsInInterval(args.startingPoint, args.endPoint, args.targetObjects)
     points.insert(0, args.startingPoint)
     
     csvFile = openCsvFile(args.output)
@@ -233,22 +238,22 @@ def main():
 
         result = findHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.fast, csvFile, args.verbosity)
         if result is not None:
-            announceHalfPoint(args.startingPoint, result, csvFile, args.verbosity)
+            announceHalfPoint(args.startingPoint, result, args.targetObjects, csvFile, args.verbosity)
         else:
             log(args.verbosity, 0, 'no half point found for {}'.format(args.startingPoint))
 
     elif args.linear:
-        points = getPointsInInterval(args.startingPoint, args.endPoint)
+        points = getPointsInInterval(args.startingPoint, args.endPoint, args.targetObjects)
         points.insert(0, args.startingPoint)
         for currentPoint in points:
             result = findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.fast, csvFile, args.verbosity)
             if result is not None:
-                announceHalfPoint(currentPoint, result, csvFile, args.verbosity)
+                announceHalfPoint(currentPoint, result, args.targetObjects, csvFile, args.verbosity)
             else:
                 log(args.verbosity, 0, 'no half point found for {}'.format(currentPoint))
 
     elif args.logarithmic:
-        points = getPointsInInterval(args.startingPoint, args.endPoint)
+        points = getPointsInInterval(args.startingPoint, args.endPoint, args.targetObjects)
         points.insert(0, args.startingPoint)
         nextPointToStartFrom = args.startingPoint
         for currentPoint in points:
@@ -256,7 +261,7 @@ def main():
                 result = findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.fast, csvFile, args.verbosity)
                 if result is not None:
                     nextPointToStartFrom = result
-                    announceHalfPoint(currentPoint, result, csvFile, args.verbosity)
+                    announceHalfPoint(currentPoint, result, args.targetObjects, csvFile, args.verbosity)
                 else:
                     log(args.verbosity, 0, 'no half point found for {}'.format(currentPoint))
 
