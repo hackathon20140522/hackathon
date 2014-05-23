@@ -115,12 +115,14 @@ def getDateOfPoint(point):
     command = ['git', 'show', '-s', '--format=%ci', point]
     return subprocess.check_output(command).splitlines()[0]
 
+
 def openCsvFile(csvFileName):
     try:
         csvFile = open(csvFileName, "w")
     except IOError:
         csvFile = None
     return csvFile
+
 
 def closeCsvFile(csvFile):
     if (csvFile != None):
@@ -154,7 +156,7 @@ def announceHalfPoint(startingPoint, targetPoint, csvFile, verbosity):
         (startingPoint, dateOfStart, dateOfHalfPoint, commitsFromStartToHalfPoint))
 
 
-def findHalfLife(startingPoint, endPoint, targetObjects, fast, verbosity, csvFile):
+def findHalfLife(startingPoint, endPoint, targetObjects, fast, csvFile, verbosity):
     linesAtStart, filesAtStartingPoint = processStartingPoint(startingPoint, targetObjects, verbosity)
     targetPoints = getTargetPoints(startingPoint, endPoint)
     if len(targetPoints) == 0:
@@ -186,15 +188,25 @@ def findHalfLife(startingPoint, endPoint, targetObjects, fast, verbosity, csvFil
 
     return None
 
+
+def estimation(countOfCommitsFromStart, linesAtStart, linesChangedAtTarget):
+    numerator = float(countOfCommitsFromStart) * float(math.log(2))
+    linesRemaining = linesAtStart - linesChangedAtTarget
+    denominator = float(math.log(linesAtStart)) - float(math.log(linesRemaining))
+    # TODO handle division by zero
+    return numerator / denominator
+
+
 #TODO integrate it to the tool-set
 #The "time" unit is number of commits
 def estimateHalfLife(startingPoint, endPoint, targetObjects, verbosity):
     linesAtStart, filesAtStartingPoint = processStartingPoint(startingPoint, targetObjects, verbosity)
     linesChangedAtTarget = countChangedLines(startingPoint, endPoint, filesAtStartingPoint)
-    commitsFromStart = len(getPointsInInterval(startingPoint, endPoint))
-    log(verbosity, 2, 'linesAtSTart {}, linesChangedAtTarget {}, commitsFromStart {}'.
-        format(linesAtStart, linesChangedAtTarget, commitsFromStart))
-    return (float(commitsFromStart)*float(math.log(2)))/(float(math.log(linesAtStart))-float(math.log(linesAtStart-linesChangedAtTarget)))
+    countOfCommitsFromStart = len(getPointsInInterval(startingPoint, endPoint))
+
+    log(verbosity, 2, 'linesAtStart: {}, linesChangedAtTarget: {}, countOfCommitsFromStart: {}'.
+        format(linesAtStart, linesChangedAtTarget, countOfCommitsFromStart))
+    return estimation(countOfCommitsFromStart, linesAtStart, linesChangedAtTarget)
     
     
 def main():
@@ -210,15 +222,18 @@ def main():
     #log(args.verbosity, 0, 'Estimated code half-life: {}'. format(estimateHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.verbosity)))
     
     if args.single_commit:
-        findHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.fast, args.verbosity, csvFile)
+        result = findHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.fast, csvFile, args.verbosity)
+        if result is not None:
+            announceHalfPoint(args.startingPoint, result, csvFile, args.verbosity)
+        else:
+            log(args.verbosity, 0, 'no half point found for {}'.format(args.startingPoint))
 
     elif args.linear:
         points = getPointsInInterval(args.startingPoint, args.endPoint)
         points.insert(0, args.startingPoint)
         for currentPoint in points:
-            result = findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.fast, args.verbosity, csvFile)
+            result = findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.fast, csvFile, args.verbosity)
             if result is not None:
-                nextPointToStartFrom = result
                 announceHalfPoint(currentPoint, result, csvFile, args.verbosity)
             else:
                 log(args.verbosity, 0, 'no half point found for {}'.format(currentPoint))
@@ -229,7 +244,7 @@ def main():
         nextPointToStartFrom = args.startingPoint
         for currentPoint in points:
             if currentPoint == nextPointToStartFrom:
-                result = findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.fast, args.verbosity, csvFile)
+                result = findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.fast, csvFile, args.verbosity)
                 if result is not None:
                     nextPointToStartFrom = result
                     announceHalfPoint(currentPoint, result, csvFile, args.verbosity)
