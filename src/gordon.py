@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import subprocess
-import math
 
 
 def log(verbosity, level, message):
@@ -190,15 +189,17 @@ def findHalfLife(startingPoint, endPoint, targetObjects, fast, csvFile, verbosit
 
 
 def estimation(countOfCommitsFromStart, linesAtStart, linesChangedAtTarget):
+    import math
+
     numerator = float(countOfCommitsFromStart) * float(math.log(2))
     linesRemaining = linesAtStart - linesChangedAtTarget
     denominator = float(math.log(linesAtStart)) - float(math.log(linesRemaining))
-    # TODO handle division by zero
+
+    if denominator == 0:
+        return float("inf")
     return numerator / denominator
 
 
-#TODO integrate it to the tool-set
-#The "time" unit is number of commits
 def estimateHalfLife(startingPoint, endPoint, targetObjects, verbosity):
     linesAtStart, filesAtStartingPoint = processStartingPoint(startingPoint, targetObjects, verbosity)
     linesChangedAtTarget = countChangedLines(startingPoint, endPoint, filesAtStartingPoint)
@@ -219,9 +220,10 @@ def main():
     csvFile = openCsvFile("output.csv")
     writeToCsvFile(csvFile, "startingGitHash,dateOfStart,dateOfHalfPoint,numOfCommits\n")
     
-    #log(args.verbosity, 0, 'Estimated code half-life: {}'. format(estimateHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.verbosity)))
-    
     if args.single_commit:
+        log(args.verbosity, 0, 'Estimated code half-life in commits: {}'.
+            format(estimateHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.verbosity)))
+
         result = findHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.fast, csvFile, args.verbosity)
         if result is not None:
             announceHalfPoint(args.startingPoint, result, csvFile, args.verbosity)
