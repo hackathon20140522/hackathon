@@ -13,6 +13,11 @@ def parseArguments():
     import argparse
 
     parser = argparse.ArgumentParser()
+    
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-s", "--single-commit", action="store_true")
+    group.add_argument("-l", "--linear", action="store_true")
+    group.add_argument("-ll", "--logarithmic", action="store_true")
 
     parser.add_argument('targetObjects', help='the files/directories you want to analyze')
     parser.add_argument('startingPoint', help='the treeish you want to start on')
@@ -26,6 +31,12 @@ def parseArguments():
     log(args.verbosity, 1, 'starting point: {}'.format(args.startingPoint))
     log(args.verbosity, 1, 'end point: {}'.format(args.endPoint))
     log(args.verbosity, 1, 'verbosity: {}'.format(args.verbosity))
+    if args.single_commit:
+        log(args.verbosity, 1, 'single commit mode')
+    elif args.linear:
+        log(args.verbosity, 1, 'linear mode')
+    elif args.logarithmic:
+        log(args.verbosity, 1, 'logarithmic mode')
     return args
 
 
@@ -109,6 +120,10 @@ def openCvsFile(cvsFileName):
         cvsFile = None
     return cvsFile
 
+def closeCvsFile(cvsFile):
+    if(cvsFile != None):
+        cvsFile.close()
+
 def writeToCvsFile(cvsFile, line):
     if(cvsFile != None):
         cvsFile.write(line)
@@ -128,10 +143,13 @@ def findHalfLife(startingPoint, endPoint, targetObjects, verbosity, cvsFile):
 
             log(verbosity, 0, 'reached half point for {} from {} at {} ({} commits)'.format
                 (startingPoint, dateOfStart, dateOfHalfPoint, commitsFromStartToHalfPoint))
+
             writeToCvsFile(cvsFile,'{},{},{},{}\n'.format(startingPoint,dateOfStart,dateOfHalfPoint,commitsFromStartToHalfPoint))
-            return
+
+            return targetPoint
 
     log(verbosity, 0, 'no half point found for {}'.format(startingPoint))
+    return None
 
 #TODO integrate it to the tool-set
 #The "time" unit is number of commits
@@ -155,11 +173,26 @@ def main():
     
     #log(args.verbosity, 0, 'Estimated code half-life: {}'. format(estimateHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.verbosity)))
     
-    for currentPoint in points:
-        findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity, cvsFile)
+    if args.single_commit:
+        findHalfLife(args.startingPoint, args.endPoint, args.targetObjects, args.verbosity, cvsFile)
+
+    elif args.linear:
+        points = getPointsInInterval(args.startingPoint, args.endPoint)
+        points.insert(0, args.startingPoint)
+        for currentPoint in points:
+            findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity, cvsFile)
+
+    elif args.logarithmic:
+        points = getPointsInInterval(args.startingPoint, args.endPoint)
+        points.insert(0, args.startingPoint)
+        nextPointToStartFrom = args.startingPoint
+        for currentPoint in points:
+            if currentPoint == nextPointToStartFrom:
+                result = findHalfLife(currentPoint, args.endPoint, args.targetObjects, args.verbosity, cvsFile)
+                if result is not None:
+                    nextPointToStartFrom = result
+
+    closeCvsFile(cvsFile)
     
-    cvsFile.close()
-
-
 if __name__ == "__main__":
     main()
