@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# coding=utf-8
 
 import subprocess
 
@@ -46,13 +47,13 @@ def parseArguments():
 
 def findFilesAtPoint(startingPoint, targetObjects):
     command = ['git', 'ls-tree', '--name-only', '-r', startingPoint, targetObjects]
-    foundFiles = subprocess.check_output(command)
+    foundFiles = subprocess.check_output(command, bufsize=-1)
     return foundFiles.splitlines()
 
 
 def countLinesInOldFile(targetFile, oldPoint, verbosity):
-    showCommand = ['git', 'show', oldPoint + ':' + targetFile]
-    oldFileContent = subprocess.check_output(showCommand)
+    showCommand = ['git', 'show', str(oldPoint) + ':' + str(targetFile)]
+    oldFileContent = subprocess.check_output(showCommand, bufsize=-1)
     lineCount = len(oldFileContent.splitlines())
     log(verbosity, 2, 'line count ({}): {}'.format(targetFile, lineCount))
 
@@ -69,7 +70,7 @@ def processStartingPoint(startingPoint, targetObjects, verbosity):
 
 def findChangedFiles(startingPoint, targetPoint):
     command = ['git', 'diff-tree', '--no-commit-id', '--name-only', '-r', startingPoint, targetPoint]
-    foundFiles = subprocess.check_output(command)
+    foundFiles = subprocess.check_output(command, bufsize=-1)
     return foundFiles.splitlines()
 
 
@@ -77,7 +78,7 @@ def statDiffOnFiles(startingPoint, targetPoint, interestingFiles):
     if not interestingFiles:
         return []
     command = ['git', 'diff', '--numstat', startingPoint, targetPoint, '--'] + list(interestingFiles)
-    interestingDiff = subprocess.check_output(command)
+    interestingDiff = subprocess.check_output(command, bufsize=-1)
     return interestingDiff.splitlines()
 
 
@@ -104,7 +105,7 @@ def countChangedLines(startingPoint, targetPoint, filesAtStartingPoint):
 
 def getPointsInInterval(startingPoint, endPoint):
     command = ['git', 'rev-list', '--reverse', startingPoint + '..' + endPoint]
-    logResult = subprocess.check_output(command)
+    logResult = subprocess.check_output(command, bufsize=-1)
     return logResult.splitlines()
 
 
@@ -116,7 +117,7 @@ def getTargetPoints(startingPoint, endPoint):
 
 def getDateOfPoint(point):
     command = ['git', 'show', '-s', '--format=%ci', point]
-    return subprocess.check_output(command).splitlines()[0]
+    return subprocess.check_output(command, bufsize=-1).splitlines()[0]
 
 
 def openCsvFile(csvFileName):
